@@ -29,7 +29,7 @@ def get_admin_user_by_token(token):
 
 @require_GET
 def get_booking_meta(request):
-    """ Feeds pricing data and active slots to React, auto-expiring stagnant pending reservations """
+    """ Feeds pricing data, active slots, and site content to React, auto-expiring stagnant pending reservations """
     
     # 1. PASSIVE EXPIRATION SWEEP: Find pending reservations older than 10 minutes
     expiration_limit = timezone.now() - timedelta(minutes=10)
@@ -38,48 +38,39 @@ def get_booking_meta(request):
         created_at__lt=expiration_limit
     )
     
-    if stale_bookings.exists():
-        for b in stale_bookings:
-            b.status = 'FAILED'
-            b.save()
-            
-            # Release the slot back into circulation if no other active booking holds it
-            # (Checks to prevent edge cases where a slot might be shared in a rare race condition)
-            still_held = BookingRecord.objects.filter(
-                date_booked=b.date_booked, 
-                time_booked=b.time_booked, 
-                status='CONFIRMED'
-            ).exists()
-            
-            if not still_held:
-                AvailableSlot.objects.filter(
-                    date_string=b.date_booked, 
-                    time_string=b.time_booked
-                ).update(is_booked=False)
+    for booking in stale_bookings:
+        # Restore slot visibility
+        AvailableSlot.objects.filter(
+            date_string=booking.date_booked, 
+            time_string=booking.time_booked
+        ).update(is_booked=False)
+        booking.status = 'FAILED'
+        booking.save()
 
-    # 2. STANDARD FLOW: Now fetch your freshly cleaned slots
-    config = ServiceConfiguration.objects.first()
-    if not config:
-        config = ServiceConfiguration.objects.create()
+    # 2. READ LIVE WEBSITE LAYOUT COPY FROM DATABASE Matrix
+    config_record = ServiceConfiguration.objects.filter(id=1).first()
+    site_content = config_record.site_content if (config_record and config_record.site_content) else {}
 
-    slots = AvailableSlot.objects.filter(is_booked=False)
-    slots_data = {}
-    for slot in slots:
-        if slot.date_string not in slots_data:
-            slots_data[slot.date_string] = []
-        slots_data[slot.date_string].append(slot.time_string)
+    # 3. CONSTRUCT FLAT ARRAY FOR SLOTS (Matches old frontend structure)
+    slots_query = AvailableSlot.objects.filter(is_booked=False)
+    slots_list = [
+        {
+            "date_string": slot.date_string,
+            "time_string": slot.time_string
+        }
+        for slot in slots_query
+    ]
 
+# 4. DISPATCH SYNCHRONIZED APP ATTRIBUTES
     return JsonResponse({
-        'service': {
-            'title': config.title,
-            'type': config.session_type,
-            'duration': config.duration,
-            'price': float(config.price),
-            'currency': config.currency,
-            'location': config.location
-        },
-        'available_slots': slots_data
-    })
+     'slots': slots_list,  # Now a true JSON array [] containing objects
+     'site_content': site_content,
+     'pricing': {
+         'amount': float(config_record.price) if config_record else 25000.00,
+            'currency': config_record.currency if config_record else 'NGN'
+     }
+}, status=200)
+
 
 @csrf_exempt
 @require_POST
@@ -516,3 +507,100 @@ def admin_reschedule_booking(request):
         return JsonResponse({'status': 'success', 'message': 'Client session shifted successfully.'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+    # ... Keep all your existing code imports and endpoints intact above ...
+
+# ==========================================
+#        NEW CMS TEXT EDITORIAL ENDPOINTS    
+# ==========================================
+
+@require_GET
+def get_system_config(request):
+    """
+    Feeds structural metadata, pricing parameters, and inline copywriting 
+    dictionaries down to client-side components safely.
+    """
+    config, created = ServiceConfiguration.objects.get_or_create(id=1)
+    
+    # Populate structural defaults if the content dictionary object is empty
+    if not config.site_content:
+        config.site_content = {
+            "homeHeroTitle": "ZAINAB AHMED",
+            "homeHeroSubtitle": "Early Childhood Consultant & Parenting Coach",
+            "homeHeroDescription": "Helping intentional parents raise confident, thriving children without losing their peace.",
+            "homePanelLabel": "Private Client Advisory",
+            "homePanelTitle": "Personal Consultation Session",
+            "homePanelDescription": "A structured 60-minute evaluation session targeting your exact family dynamics.",
+            "serviceType": "Private Advisory Session",
+            "serviceTitle": "1:1 Parenting Consultation",
+            "serviceSubtitle": "Expert guidance. Practical strategies. Real results.",
+            "serviceDescription": "This 1:1 consultation is designed to help you navigate your child's behavior with practical, developmentally appropriate strategies. You'll leave with clear tools you can start using immediately.",
+            "intakeFormTitle": "Consultation Intake Questionnaire",
+            "intakeFormFooter": "Can't wait to get in touch with you"
+        }
+        config.save()
+
+    return JsonResponse({
+        'session_price': str(config.price),
+        'site_content': config.site_content,
+        'title': config.title,
+        'type': config.session_type,
+        'duration': config.duration,
+        'currency': config.currency,
+        'location': config.location
+    })
+
+
+@csrf_exempt
+@require_POST
+def update_system_price(request):
+    """ Secure pipeline access checkpoint to alter flat pricing metadata rows """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    token = auth_header.replace('Token ', '').strip() if 'Token ' in auth_header else ''
+    
+    if not token or not get_admin_user_by_token(token):
+        return JsonResponse({'error': 'Unauthorized admin request context.'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        price_val = data.get('price')
+        if not price_val:
+            return JsonResponse({'error': 'Missing price value.'}, status=400)
+            
+        config, _ = ServiceConfiguration.objects.get_or_create(id=1)
+        config.price = price_val
+        config.save()
+        return JsonResponse({'status': 'Price successfully modified.'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_POST
+def update_system_content(request):
+    """ Secure operational layout pipeline to update site-wide editable copy schemas """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    token = auth_header.replace('Token ', '').strip() if 'Token ' in auth_header else ''
+    
+    if not token or not get_admin_user_by_token(token):
+        return JsonResponse({'error': 'Unauthorized admin request context.'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        site_content = data.get('site_content')
+        
+        if not site_content or not isinstance(site_content, dict):
+            return JsonResponse({'error': 'Invalid site content schema parameters.'}, status=400)
+            
+        config, _ = ServiceConfiguration.objects.get_or_create(id=1)
+        
+        # Merge mutations directly into our central system layout data block
+        current_content = config.site_content or {}
+        for key, val in site_content.items():
+            current_content[key] = val
+            
+        config.site_content = current_content
+        config.save()
+        return JsonResponse({'status': 'Dynamic site copy layout successfully committed.'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

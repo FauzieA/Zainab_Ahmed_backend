@@ -16,4 +16,11 @@ urlpatterns = [
     path('admin-reschedule/', views.admin_reschedule_booking, name='admin-reschedule'),
     path('admin-manual-reserve/', views.admin_manual_reserve, name='admin-manual-reserve'),
     path('admin-blackout/', views.admin_blackout_dates, name='admin-blackout'),
+    
+    # NEW SYSTEM LAYOUT ROUTE TARGETS
+    path('config/', views.get_system_config, name='get-system-config'),
+    path('config/update-price/', views.update_system_price, name='update-system-price'),
+    path('config/update-content/', views.update_system_content, name='update-system-content'),
+
+    
 ]

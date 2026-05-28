@@ -26,10 +26,11 @@ def get_calendar_service():
 
     return build('calendar', 'v3', credentials=creds)
 
-def generate_google_meet_link(date_str, time_str, summary, description, client_email):
+def generate_google_meet_link(date_str, time_str, summary, description, client_email, duration_minutes=90):
     """
     Creates a formal Google Calendar Event and auto-injects a native Google Meet space.
     Expects date_str format: "DD/MM/YYYY" and time_str format: "10:00 AM"
+    Accepts dynamic session duration in minutes (defaults to 90 if not provided).
     """
     try:
         service = get_calendar_service()
@@ -39,7 +40,9 @@ def generate_google_meet_link(date_str, time_str, summary, description, client_e
         parsed_time = datetime.datetime.strptime(f"{date_str} {time_clean}", "%d/%m/%Y %I:%M %p")
         
         start_time = parsed_time.isoformat()
-        end_time = (parsed_time + datetime.timedelta(minutes=90)).isoformat() # 90 Minute Duration default
+        
+        # FIX: Replaced the hardcoded 90 minutes with the dynamic parameter
+        end_time = (parsed_time + datetime.timedelta(minutes=duration_minutes)).isoformat() 
         
         # 2. Build the event payload architecture demanding a Google Meet asset
         event_body = {
