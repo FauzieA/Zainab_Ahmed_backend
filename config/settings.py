@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 SECRET_KEY = 'your-django-core-secret-key'
-DEBUG = True
-ALLOWED_HOSTS = ['*']  # Restrict this appropriately in live production environments
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -25,6 +26,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Handles cross-origin requests
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -63,10 +65,10 @@ TEMPLATES = [
 
 # Ensure Django has a standard SQLite layout target configured to write to
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600
+    )
 }
 
 # Tells Django how to handle automatic model index increments safely
@@ -74,7 +76,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- STATIC FILES CONFIGURATION ---
 # The URL path used to access static files in the browser (Must have leading and trailing slashes)
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Tells Django to optimize and compress static assets
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Tells Django where to look for global static files during development
 STATICFILES_DIRS = []
