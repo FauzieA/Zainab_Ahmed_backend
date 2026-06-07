@@ -5,7 +5,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
-SECRET_KEY = 'your-django-core-secret-key'
+SECRET_KEY = '3o6223a^n@4c4@c4o=u6t8w_mqlbjgv4njg+*p$zipz_e!%%06'
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
@@ -40,6 +40,7 @@ ROOT_URLCONF = 'config.urls'
 # Allow your local React frontend port to securely complete API operations
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://zainab-ahmed-eosin.vercel.app"
 ]
 
 # Paystack API Keys (Store these safely in an environment file later)
