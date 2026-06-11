@@ -40,7 +40,8 @@ ROOT_URLCONF = 'config.urls'
 # Allow your local React frontend port to securely complete API operations
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://zainab-ahmed-eosin.vercel.app"
+    "https://zainab-ahmed-eosin.vercel.app",
+    "https://zainab-consulting.vercel.app",
 ]
 
 # Paystack API Keys (Store these safely in an environment file later)
