@@ -85,14 +85,33 @@ def create_booking_intent(request):
             return JsonResponse({'error': 'Missing client email or selected schedules.'}, status=400)
 
         for slot in selected_slots:
-            exists = AvailableSlot.objects.filter(
-                date_string=slot.get('date'), 
-                time_string=slot.get('time'), 
-                is_booked=False
-            ).exists()
-            if not exists:
-                return JsonResponse({'error': "Selected space coordinate is unavailable."}, status=400)
+            # 1. Grab base form fields or default to N/A
+            base_notes = data.get('intake_notes', 'N/A')
+            
+            # 2. Extract dynamically appended fields if an admin added new questions
+            custom_extensions = data.get('custom_intake_extensions', '')
+            
+            # 3. Concatenate cleanly so it all streams safely into your text field column
+            if custom_extensions:
+                notes_payload = f"{base_notes} | Extra Answers: {custom_extensions}"
+            else:
+                notes_payload = base_notes
 
+            BookingRecord.objects.create(
+                booking_reference=unique_booking_ref, 
+                client_email=client_email,
+                client_name=data.get('client_name'),
+                client_phone=data.get('client_phone'),
+                child_name=data.get('child_name', ''),
+                child_age=int(data.get('child_age')) if data.get('child_age') else None,
+                child_gender=data.get('child_gender'),
+                school_status=data.get('school_status'),
+                intake_notes=notes_payload,  # Stores everything cleanly!
+                date_booked=slot.get('date'),
+                time_booked=slot.get('time'),
+                amount_paid=config.price, 
+                status='PENDING'
+            )
         config = ServiceConfiguration.objects.first()
         if not config:
             config = ServiceConfiguration.objects.create()
